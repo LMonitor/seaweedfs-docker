@@ -1,0 +1,88 @@
+version: '3.9'
+
+services:
+  master:
+    image: chrislusf/seaweedfs:3.71_large_disk # use a remote image
+    networks:
+      - lmonitor
+    ports:
+      - 9333:9333
+      - 19333:19333
+      - 9324:9324
+    volumes:
+      - /mnt/seaweedfs:/data
+    command: "master -ip=master -ip.bind=0.0.0.0 -metricsPort=9324 -mdir=/data/master -volumeSizeLimitMB=137439" #will this work with entrypoint already setting a value
+  volume:
+    image: chrislusf/seaweedfs:3.71_large_disk # use a remote image
+    networks:
+      - lmonitor
+    ports:
+      - 8080:8080
+      - 18080:18080
+      - 9325:9325
+    command: 'volume -mserver="master:9333" -ip.bind=0.0.0.0 -port=8080  -metricsPort=9325 -dir=/datak/volume -max=300 -index=leveldb'
+    volumes:
+      - /mnt/seaweedfs:/data
+    depends_on:
+      - master
+  filer:
+    image: chrislusf/seaweedfs:3.71_large_disk # use a remote image
+    networks:
+      - lmonitor
+    ports:
+      - 8888:8888
+      - 18888:18888
+      - 9326:9326
+    command: 'filer -master="master:9333" -ip.bind=0.0.0.0 -metricsPort=9326'
+    volumes:
+      - /mnt/seaweedfs:/data
+    tty: true
+    stdin_open: true
+    depends_on:
+      - master
+      - volume
+  s3:
+    image: chrislusf/seaweedfs:3.71_large_disk # use a remote image
+    networks:
+      - lmonitor
+    ports:
+      - 8333:8333
+      - 9327:9327
+    command: 's3 -filer="filer:8888" -ip.bind=0.0.0.0 -metricsPort=9327'
+    volumes:
+      - /mnt/seaweedfs:/data
+    depends_on:
+      - master
+      - volume
+      - filer
+      #webdav:
+      #  image: chrislusf/seaweedfs:3.71_large_disk # use a remote image
+      #  networks:
+      #    - lmonitor
+      #  ports:
+      #    - 7333:7333
+      #  command: 'webdav -filer="filer:8888"'
+      #  volumes:
+      #    - /mnt/seaweedfs:/data
+      #  depends_on:
+      #    - master
+      #    - volume
+      #    - filer
+  prometheus:
+    image: prom/prometheus:v2.21.0
+    networks:
+      - lmonitor
+    ports:
+      - 9000:9090
+    volumes:
+      - /opt/seaweedfs/prometheus:/etc/prometheus
+    command: --web.enable-lifecycle  --config.file=/etc/prometheus/prometheus.yml
+    depends_on:
+      - s3
+networks:
+  lmonitor:
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: "10.0.0.2"
+    ipam:
+      config:
+        - subnet: "172.21.0.0/16"
