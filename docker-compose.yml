@@ -20,7 +20,7 @@ services:
       - 8080:8080
       - 18080:18080
       - 9325:9325
-    command: 'volume -mserver="master:9333" -ip.bind=0.0.0.0 -port=8080  -metricsPort=9325 -dir=/datak/volume -max=300 -index=leveldb'
+    command: 'volume -mserver="master:9333" -ip.bind=0.0.0.0 -port=8080  -metricsPort=9325 -dir=/data/volume -max=300 -index=leveldb'
     volumes:
       - /mnt/seaweedfs:/data
     depends_on:
